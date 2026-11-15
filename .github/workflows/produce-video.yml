@@ -42,7 +42,7 @@ jobs:
           curl --fail --location --retry 3 \
             "https://github.com/tomhek820-stack/ZORO-F/releases/download/arabic-assets-001/ZORO_ARABIC_ASSETS.tar.gz" \
             -o /tmp/zoro-arabic-assets.tar.gz
-          tar -xzf /tmp/zoro-arabic-assets.tar.gz -C "$GITHUB_WORKSPACE" --no-same-owner
+          tar --wildcards -xzf /tmp/zoro-arabic-assets.tar.gz -C "$GITHUB_WORKSPACE" --no-same-owner "./assets/fonts/*"
           test -s assets/fonts/NotoNaskhArabic-Regular.ttf
           test -s assets/fonts/Amiri-Bold.ttf
           echo "Arabic font bundle is ready."
