@@ -1,10 +1,10 @@
 import json
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, features
+from gtts import gTTS
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "output"
@@ -67,26 +67,31 @@ def run(cmd):
     subprocess.run(cmd, check=True)
 
 def voice(text, cfg, path):
-    voice_name = cfg.get("voice", "ar-SA-HamedNeural")
-    rate = cfg.get("rate", "+0%")
-    volume = cfg.get("volume", "+0%")
+    """Generate Arabic speech with the free Google Translate TTS endpoint via gTTS.
+
+    gTTS does not expose a voice-gender selector; the Arabic voice is selected
+    automatically by the service.
+    """
     last_error = None
     for attempt in range(1, 4):
         try:
-            run([
-                "edge-tts", "--voice", voice_name, "--rate", rate,
-                "--volume", volume, "--text", text, "--write-media", str(path)
-            ])
+            # Remove any partial output left by an interrupted request.
+            path.unlink(missing_ok=True)
+            print(f"Generating Arabic narration with gTTS (attempt {attempt}/3)...", flush=True)
+            gTTS(text=text, lang="ar", slow=False).save(str(path))
             if path.is_file() and path.stat().st_size > 4096:
+                print(f"Arabic narration ready: {path.stat().st_size} bytes", flush=True)
                 return
-            raise RuntimeError("Edge TTS returned an empty or invalid audio file")
+            raise RuntimeError("gTTS returned an empty or invalid audio file")
         except Exception as exc:
             last_error = exc
-            print(f"Edge TTS attempt {attempt}/3 failed: {exc}", flush=True)
+            print(f"gTTS attempt {attempt}/3 failed: {exc}", flush=True)
             if attempt < 3:
-                time.sleep(4 * attempt)
+                import time
+                time.sleep(3 * attempt)
     raise RuntimeError(
-        f"Natural Arabic TTS failed for voice {voice_name}; refusing to publish robotic fallback audio. "
+        "Arabic gTTS generation failed after 3 attempts. "
+        "Check GitHub Actions network access and retry. "
         f"Last error: {last_error}"
     )
 
