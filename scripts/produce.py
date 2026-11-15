@@ -1,9 +1,8 @@
-import asyncio, json, subprocess, sys
+import json, subprocess, sys
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 import arabic_reshaper
 from bidi.algorithm import get_display
-import edge_tts
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT, TMP = ROOT / "output", ROOT / "output" / "tmp"
@@ -36,8 +35,13 @@ def make_scene(scene, index, total):
     centered(d,f"{index+1:02d} / {total:02d}",1540,font(34),MUTED)
     centered(d,"تابع للمزيد من المحتوى التقني",1680,font(34),WHITE)
     p=TMP/f"scene_{index:02d}.png"; im.save(p,optimize=True); return p
-async def voice(text, cfg, path):
-    await edge_tts.Communicate(text,voice=cfg.get("voice","ar-SA-HamedNeural"),rate=cfg.get("rate","+0%"),volume=cfg.get("volume","+0%")).save(str(path))
+def voice(text, cfg, path):
+    wav = path.with_suffix(".wav")
+    speed = int(cfg.get("speech_rate", 145))
+    run(["espeak-ng", "-v", "ar", "-s", str(speed), "-w", str(wav), text])
+    run(["ffmpeg", "-y", "-i", str(wav), "-codec:a", "libmp3lame", "-q:a", "3", str(path)])
+    if not path.exists() or path.stat().st_size < 1024:
+        raise RuntimeError("Arabic speech engine did not create a valid audio file")
 def run(cmd):
     print("+"," ".join(map(str,cmd)),flush=True); subprocess.run(cmd,check=True)
 def stamp(sec):
@@ -46,7 +50,7 @@ def main():
     cfgpath=Path(sys.argv[1]) if len(sys.argv)>1 else ROOT/"content/video_001.json"
     cfg=json.loads(cfgpath.read_text(encoding="utf-8")); OUT.mkdir(exist_ok=True); TMP.mkdir(parents=True,exist_ok=True)
     scenes=cfg["scenes"]; narration=" ".join(x["narration"] for x in scenes)
-    audio=OUT/f"video_{cfg['episode']}_voice.mp3"; asyncio.run(voice(narration,cfg,audio))
+    audio=OUT/f"video_{cfg['episode']}_voice.mp3"; voice(narration,cfg,audio)
     concat=TMP/"scenes.txt"; lines=[]
     for i,s in enumerate(scenes):
         p=make_scene(s,i,len(scenes)); lines.extend([f"file '{p.as_posix()}'",f"duration {int(s['duration'])}"])
